@@ -1,0 +1,6 @@
+[package]
+name = "spectral-music-v2"
+version = "0.1.0"
+edition = "2021"
+description = "Complete spectral music theory: chords as nodes, voice-leading as edges, CR as consonance, splines as voice-leading paths. Pure Rust."
+license = "MIT"
