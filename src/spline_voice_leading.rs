@@ -250,8 +250,6 @@ impl SplineVoiceLeading {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::chord::ChordQuality;
-
     #[test]
     fn test_smoothest_voice_leading() {
         let chords = vec![
@@ -314,5 +312,68 @@ mod tests {
         let cost = svl.total_cost();
         // ii-V-I in close position: total should be quite low
         assert!(cost < 12.0, "ii-V-I total cost should be low, got {}", cost);
+    }
+
+    #[test]
+    fn test_minimal_assignment_brute_force_optimal() {
+        // Hand-computable optimal assignment for the brute-force path (n <= 4).
+        // Current: C4 E4 G4. Target: G major (G4 B4 D5).
+        // Optimal permutation: C4 -> B4 (1), E4 -> D5 (2), G4 -> G4 (0), total 3.
+        let current = vec![
+            Pitch { midi: 60 }, // C4
+            Pitch { midi: 64 }, // E4
+            Pitch { midi: 67 }, // G4
+        ];
+        let target = Chord::from_name("G").unwrap();
+        let assignment = SplineVoiceLeading::minimal_assignment(&current, &target, 3);
+        assert_eq!(
+            assignment,
+            vec![
+                Pitch { midi: 71 }, // B4
+                Pitch { midi: 74 }, // D5
+                Pitch { midi: 67 }, // G4
+            ]
+        );
+    }
+
+    #[test]
+    fn test_minimal_assignment_greedy_distinct_targets() {
+        // Greedy path (n > 4) must not assign two voices to the same target pitch
+        // while an unclaimed target pitch still exists.
+        // Five voices moving to a C major triad (only 3 distinct pitches).
+        //
+        // Voice 0 claims C4. Voices 1 and 2 are placed so that their closest
+        // target would also be C4; the fixed implementation must skip the
+        // already-claimed C4 and pick distinct, still-free targets instead.
+        let current = vec![
+            Pitch { midi: 60 }, // C4 -> C4
+            Pitch { midi: 59 }, // B3 -> G4 (C4 is already claimed)
+            Pitch { midi: 62 }, // D4 -> E4 (C4 is already claimed)
+            Pitch { midi: 48 }, // C3 -> C4 once all pitches are claimed
+            Pitch { midi: 52 }, // E3 -> E4 once all pitches are claimed
+        ];
+        let target = Chord::from_name("C").unwrap();
+        let assignment = SplineVoiceLeading::minimal_assignment(&current, &target, 5);
+        assert_eq!(assignment.len(), 5);
+
+        // The first three voices should claim all three distinct target pitches.
+        let first_three: std::collections::HashSet<_> =
+            assignment[..3].iter().map(|p| p.midi).collect();
+        assert_eq!(
+            first_three.len(),
+            3,
+            "first three voices should each get a distinct target pitch"
+        );
+
+        // Voice 1 must not collide with voice 0 while G4 is still free.
+        assert_ne!(
+            assignment[1].midi, 60,
+            "greedy should avoid reusing C4 while other targets are free"
+        );
+        // Voice 2 must not collide with voice 0 while E4 is still free.
+        assert_ne!(
+            assignment[2].midi, 60,
+            "greedy should avoid reusing C4 while other targets are free"
+        );
     }
 }
