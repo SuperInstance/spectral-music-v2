@@ -91,11 +91,21 @@ impl SplineVoiceLeading {
                 result[i] = target_pitches[best_assignment[i] % target_pitches.len()];
             }
         } else {
-            // Greedy nearest neighbor
+            // Greedy nearest neighbor, enforcing a distinct target pitch per
+            // voice while any unclaimed pitch remains.
+            //
+            // When there are more voices than distinct target pitches, doubling
+            // is unavoidable; once every target pitch has been claimed we relax
+            // the constraint and allow reuse, again choosing the closest pitch.
+            let mut used_count = 0;
             for i in 0..n {
                 let mut best_j = 0;
                 let mut best_dist = f64::INFINITY;
+                let allow_reuse = used_count >= target_pitches.len();
                 for j in 0..target_pitches.len() {
+                    if !allow_reuse && used[j] {
+                        continue;
+                    }
                     let interval = current[i].interval_to(&target_pitches[j]);
                     let dist = interval.minimal_distance();
                     if dist < best_dist {
@@ -104,6 +114,10 @@ impl SplineVoiceLeading {
                     }
                 }
                 result[i] = target_pitches[best_j];
+                if !used[best_j] {
+                    used[best_j] = true;
+                    used_count += 1;
+                }
             }
         }
 
