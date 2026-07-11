@@ -57,11 +57,16 @@ impl Pitch {
         self.midi % 12
     }
 
-    /// Note name for display
+    /// Note name for display in scientific pitch notation
+    /// (consistent with `from_note`: C4 = MIDI 60, A4 = MIDI 69).
     pub fn name(&self) -> String {
-        let names = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+        let names = [
+            "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B",
+        ];
         let pc = self.pitch_class() as usize;
-        let octave = self.midi / 12;
+        // Scientific pitch notation: octave = midi / 12 - 1
+        // (MIDI 0 = C-1, MIDI 12 = C0, MIDI 60 = C4, MIDI 69 = A4)
+        let octave = self.midi as i32 / 12 - 1;
         format!("{}{}", names[pc], octave)
     }
 }
@@ -187,5 +192,28 @@ mod tests {
     fn test_pitch_class() {
         assert_eq!(Pitch { midi: 60 }.pitch_class(), 0); // C
         assert_eq!(Pitch { midi: 69 }.pitch_class(), 9); // A
+    }
+
+    #[test]
+    fn test_pitch_name() {
+        // Scientific pitch notation: C4 = MIDI 60, A4 = MIDI 69
+        assert_eq!(Pitch { midi: 60 }.name(), "C4");
+        assert_eq!(Pitch { midi: 69 }.name(), "A4");
+        assert_eq!(Pitch { midi: 12 }.name(), "C0");
+        assert_eq!(Pitch { midi: 0 }.name(), "C-1");
+        // Sharps
+        assert_eq!(Pitch { midi: 61 }.name(), "C#4");
+        assert_eq!(Pitch { midi: 66 }.name(), "F#4");
+    }
+
+    #[test]
+    fn test_from_note_name_roundtrip() {
+        // from_note and name() must use the same octave convention
+        let a4 = Pitch::from_note('A', 4, false);
+        assert_eq!(a4.name(), "A4");
+        let c4 = Pitch::from_note('C', 4, false);
+        assert_eq!(c4.name(), "C4");
+        let g_sharp = Pitch::from_note('G', 4, true);
+        assert_eq!(g_sharp.name(), "G#4");
     }
 }
